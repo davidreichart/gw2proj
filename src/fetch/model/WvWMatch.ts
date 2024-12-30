@@ -1,6 +1,7 @@
 /**
  * @file WvWMatch.ts
  * @description This file is an object model defining all fields that make up a single WvW match between three teams.
+ * The endpoint used to collect this data is https://api.guildwars2.com/v2/wvw/matches/${matchID}
  */
 
 /**
