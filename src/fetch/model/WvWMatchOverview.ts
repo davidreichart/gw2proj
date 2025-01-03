@@ -4,6 +4,7 @@
  * https://api.guildwars2.com/v2/wvw/matches/overview?id=.... which is a shell description of a WvW match that only
  * details what worlds are involved and when the match starts/ends.
  */
+
 import {AllWorlds} from "./WvWMatch.ts";
 
 /**
