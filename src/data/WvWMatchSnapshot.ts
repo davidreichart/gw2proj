@@ -1,4 +1,13 @@
 /**
+ * @file WvWMatchSnapshot.ts
+ * @description This file defines what a WvW match snapshot is and provides utility functions to fetch information
+ * from the GW2 API that creates an array of these snapshot objects.
+ * A WvW match snapshot is a minimal representation of a WvW match that includes the IDs and names of the three
+ * worlds participating in the match.
+ * An array of these snapshots can be created using the {@linkcode generateMatchSnapShots} function.
+ */
+
+/**
  * This enum reveals the name of each server based on its ID provided by the GW2 API.
  * ServerName[{id}] will provide the string-name of a server based on an id.
  */
@@ -56,6 +65,17 @@ enum ServerName {
     "Baruch Bay [SP]" = 2301,
 }
 
+/**
+ * This class represents the minimal data required to represent a WvW match between three teams.
+ * The worlds of each team are determined at object creation as specified by {@linkcode ServerName}.
+ * @param redID The ID of the red team's server.
+ * @param blueID The ID of the blue team's server.
+ * @param greenID The ID of the green team's server.
+ * @param matchID The ID of the match.
+ * @param redWorldName The name of the red team's server.
+ * @param blueWorldName The name of the blue team's server.
+ * @param greenWorldName The name of the green team's server.
+ */
 class MatchSnapshot {
     private redID: number;
     private blueID: number;
@@ -75,43 +95,75 @@ class MatchSnapshot {
         this.blueWorldName = ServerName[this.blueID];
         this.greenWorldName = ServerName[this.greenID];
     }
+
+    /**
+     * Converts the match snapshot data to a JSON string.
+     * @return A JSON string representing the match snapshot data.
+     */
+    public toJsonString(): string {
+        const matchSnapshotData = {
+            redID: this.redID,
+            blueID: this.blueID,
+            greenID: this.greenID,
+            matchID: this.matchID,
+            redWorldName: this.redWorldName,
+            blueWorldName: this.blueWorldName,
+            greenWorldName: this.greenWorldName
+        };
+
+        return JSON.stringify(matchSnapshotData);
+    }
 }
 
-async function fetchMatchSnapshots() {
-    // how many matches are there to create snapshots for?
-    let matchCount: number;
-    let matchList: Response;
-    let data;
+/**
+ * Fetches the list of all currently active WvW match IDs from the GW2 API.
+ * @return An array of strings representing the available matches.
+ */
+async function fetchCurrentMatchList(): Promise<string[]> {
     try {
-        matchList = await fetch('https://api.guildwars2.com/v2/wvw/matches');
-        if (!matchList.ok) {
-            console.error(`Fetch error: ${matchList.status}`);
-            return;
-        }
-        data = await matchList.json();
-        matchCount = data.length;
-    } catch (error) {
-        console.error(`Fetch error: ${error}`);
-        return;
-    }
+        const response: Response = await fetch('https://api.guildwars2.com/v2/wvw/matches');
 
-    // query each match from the api to see what servers are assigned against each other and what teams are they on
-    const snapshots: MatchSnapshot[] = [];
-    const foundMatches: string[] = data;
-    for (let i = 0; i < matchCount; i++) {
-        try {
-            const response = await fetch(`https://api.guildwars2.com/v2/wvw/matches/overview?id=${foundMatches.at(i)}`)
-            if (!response.ok) {
-                console.error(`Fetch error: ${response.status}`);
-                return;
-            }
-            const data = await response.json();
-            console.log(data);
-        } catch (error) {
-            console.error(`Fetch error: ${error}`);
-            return;
+        if (!response.ok) {
+            throw new Error(`Fetch error ${response.status}`);
         }
+
+        return await response.json();
+    } catch (error) {
+        throw new Error(`Fetch error ${error}`);
     }
 }
 
-fetchMatchSnapshots();
+/**
+ * Fetches the WvW match snapshots for each match in the provided list.
+ * A match snapshot consists of the IDs and names of the three worlds participating in a match.
+ * @param matchList An array of strings representing the IDs of the matches to fetch snapshots for.
+ * @return An array of {@linkcode MatchSnapshot} objects.
+ * @see {@linkcode MatchSnapshot}
+ * @param matchList
+ */
+async function fetchMatchSnapshots(matchList: string[]): Promise<MatchSnapshot[]> {
+    const snapshots: MatchSnapshot[] = [];
+    for (const match of matchList) {
+        try {
+            const response: Response = await fetch(`https://api.guildwars2.com/v2/wvw/matches/overview?id=${match}`);
+            if (!response.ok) {
+                throw new Error(`Snapshot fetch error ${response.status}`);
+            }
+
+            const jsonObject = await response.json();
+            snapshots.push(new MatchSnapshot(jsonObject.worlds.red, jsonObject.worlds.blue, jsonObject.worlds.green, jsonObject.id));
+        } catch (error) {
+            throw new Error(`Snapshot fetch error ${error}`);
+        }
+    }
+    return snapshots;
+}
+
+/**
+ * Generates an array of {@linkcode MatchSnapshot} objects for all currently active WvW matches.
+ */
+async function generateMatchSnapShots(): Promise<MatchSnapshot[]> {
+    const matchList: string[] = await fetchCurrentMatchList();
+    const snapshots: MatchSnapshot[] = await fetchMatchSnapshots(matchList);
+    return snapshots;
+}
